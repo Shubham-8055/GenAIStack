@@ -1,0 +1,12 @@
+
+# Valid .dockerignore
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+data_files
+frontend

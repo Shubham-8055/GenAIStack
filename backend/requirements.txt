@@ -1,0 +1,32 @@
+# Core Framework
+fastapi
+uvicorn[standard]
+pydantic
+
+# Database
+sqlalchemy[asyncio]
+asyncpg
+greenlet
+
+# LLM & Embeddings
+langchain
+langchain-community
+langchain-chroma
+langchain-openai
+sentence-transformers
+huggingface-hub
+
+# Vector Store
+chromadb
+
+# File Handling
+pypdf
+python-multipart
+aiofiles
+
+# Redis (session caching)
+redis
+
+# Utilities
+python-dotenv
+pandas
