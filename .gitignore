@@ -23,7 +23,6 @@ dist/
 .next/
 
 # Environment
-.env
 
 # IDE
 .vscode/
