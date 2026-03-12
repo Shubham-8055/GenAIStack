@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   backend:
+    container_name: genai-backend
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -29,6 +30,7 @@ services:
     restart: unless-stopped
 
   postgres:
+    container_name: genai-postgres
     image: postgres:16-alpine
     environment:
       - POSTGRES_USER=postgres
@@ -46,12 +48,14 @@ services:
     restart: unless-stopped
 
   redis:
+    container_name: genai-redis
     image: redis:alpine
     ports:
       - "6379:6379"
     restart: unless-stopped
 
   redis-commander:
+    container_name: genai-redis-commander
     image: rediscommander/redis-commander:latest
     environment:
       - REDIS_HOSTS=local:redis:6379
@@ -61,6 +65,7 @@ services:
       - redis
 
   frontend:
+    container_name: genai-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
