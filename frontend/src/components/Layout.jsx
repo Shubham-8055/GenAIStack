@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Settings, FileUp, MessageSquare, ChevronLeft, Sparkles, ScrollText, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Settings, FileUp, MessageSquare, ChevronLeft, Sparkles, ScrollText, Sun, Moon, Receipt } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
 const projectNavItems = [
     { path: 'settings', icon: Settings, label: 'Agent Settings' },
     { path: 'documents', icon: FileUp, label: 'Documents' },
+    { path: 'transactions', icon: Receipt, label: 'Transactions' },
     { path: 'playground', icon: MessageSquare, label: 'Playground' },
     { path: 'logs', icon: ScrollText, label: 'Query Logs' },
 ];

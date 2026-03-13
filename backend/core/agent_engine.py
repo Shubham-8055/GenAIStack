@@ -97,26 +97,39 @@ async def run_pipeline(
     orchestrator_prompt = config.orchestrator_prompt
     if config.enable_tool_agent:
         # Append transaction_agent as a routing target
-        tool_agent_section = """
+        # Build dynamic clarification phrase based on project fields
+        field_labels = [f.get("label", f.get("name", "")) for f in (config.tool_agent_fields or [])]
+        if field_labels:
+            fields_desc = "transaction amount, date, and " + ", ".join(field_labels).lower()
+        else:
+            fields_desc = "transaction amount and date"
+        
+        clarification_msg = f"Could you please provide the {fields_desc}?"
+
+        tool_agent_section = f"""
 
 3. `transaction_agent`
-Use this when the user query involves:
-- Checking a transaction status
-- Looking up a specific payment or transfer
-- Finding transaction details using date, amount, or Aadhaar number
-- Any query mentioning "transaction", "payment status", "transfer", "RRN", or "Aadhaar"
+Use this ONLY when the user provides SPECIFIC transaction details such as:
+- A specific date ("yesterday", "10th March", etc.)
+- A specific amount ("₹5000", "5000 rupees")
+- Any specific identifier like {', '.join(field_labels) if field_labels else 'RRN'}
+- A combination of the above to look up a specific transaction
+
+Do NOT use this for vague requests like "show my transactions", "need txn info", or "transaction history".
+For vague requests, use `direct_response` and ask exactly: "{clarification_msg}"
 
 Inputs:
 - `query`: The original user query (the agent will extract params itself).
 
 Example:
-{
+Example:
+{{
     "thought": "User is asking about a specific transaction status.",
     "target": "transaction_agent",
-    "parameters": {
+    "parameters": {{
         "query": "Check status of 5000 transaction done yesterday, Aadhaar ending 1234"
-    }
-}
+    }}
+}}
 """
         # Insert before the STRICT DECISION RULES section
         if "### STRICT DECISION RULES" in orchestrator_prompt:
@@ -127,11 +140,16 @@ Example:
             # Also add the transaction routing rule
             orchestrator_prompt = orchestrator_prompt.replace(
                 "When in doubt",
-                "If the question is about checking a SPECIFIC transaction → ALWAYS use `transaction_agent`.\n5. When in doubt"
+                f"If the question is about checking a SPECIFIC transaction with details (date, amount, etc.) → use `transaction_agent`.\n5. If the user asks vaguely about transactions without specific details → use `direct_response` and output EXACTLY: \"{clarification_msg}\"\n6. When in doubt"
             )
         else:
             # Fallback: just append to the end
             orchestrator_prompt += tool_agent_section
+
+    # Force strict JSON start to prevent API 500 errors with reasoning models
+    orchestrator_prompt += """\n\nCRITICAL: DO NOT output any conversational text or reasoning outside the JSON.
+Your entire reasoning MUST go inside the `"thought"` key.
+Your response MUST start with exactly `{` and end with `}`."""
 
     orchestrator = MainOrchestrator(
         system_prompt=orchestrator_prompt,
@@ -141,6 +159,13 @@ Example:
     command = orchestrator.execute(user_query, chat_history)
     target = command.get("target", "error")
     params = command.get("parameters", {})
+
+    # Normalize target aliases so the LLM can use either name
+    if target in ("transaction_lookup_agent", "transaction_lookup"):
+        target = "transaction_agent"
+        print(f"[AgentEngine] Normalized target to 'transaction_agent'")
+
+    print(f"[AgentEngine] Target: {target}, Params: {params}")
 
     # 5. Execute based on routing decision
     if target == "rag_agent" and config.enable_rag:
@@ -182,8 +207,24 @@ Example:
         )
         extracted = tool_agent.extract_params(params.get("query", user_query))
 
-        # Route to internal or external DB
-        if config.tool_data_source == "external" and config.external_db_connection:
+        # Safety check: if ALL extracted params are null, ask for clarification
+        # instead of returning all transactions unfiltered
+        has_any_filter = any(
+            v is not None and v != "" and v != "null"
+            for v in extracted.values()
+        )
+        if not has_any_filter:
+            print("[AgentEngine] No filters extracted — asking for clarification.")
+            
+            # Dynamically build question from fields
+            field_labels = [f.get("label", f.get("name", "")) for f in fields]
+            if field_labels:
+                fields_desc = "transaction amount, date, and " + ", ".join(field_labels).lower()
+            else:
+                fields_desc = "transaction amount and date"
+                
+            answer = f"Could you please provide the {fields_desc}?"
+        elif config.tool_data_source == "external" and config.external_db_connection:
             # Query user's external database
             rows = query_external_db(
                 connection_string=config.external_db_connection,
