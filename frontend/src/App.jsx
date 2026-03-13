@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import Dashboard from './pages/Dashboard';
 import ProjectSettings from './pages/ProjectSettings';
 import DocumentUpload from './pages/DocumentUpload';
+import TransactionsList from './pages/TransactionsList';
 import Playground from './pages/Playground';
 import QueryLogs from './pages/QueryLogs';
 
@@ -18,6 +19,7 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/project/:projectId/settings" element={<ProjectSettings />} />
               <Route path="/project/:projectId/documents" element={<DocumentUpload />} />
+              <Route path="/project/:projectId/transactions" element={<TransactionsList />} />
               <Route path="/project/:projectId/playground" element={<Playground />} />
               <Route path="/project/:projectId/logs" element={<QueryLogs />} />
               <Route path="*" element={<Navigate to="/" replace />} />
