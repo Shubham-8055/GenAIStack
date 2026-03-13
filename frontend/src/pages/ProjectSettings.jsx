@@ -152,46 +152,29 @@ const ProjectSettings = () => {
                     </div>
                 </section>
 
-                {/* Model Settings */}
-                <section className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 mb-6 shadow-sm dark:shadow-none transition-colors">
-                    <h2 className="text-lg font-semibold text-gray-800 dark:text-slate-200 mb-4">Model Configuration</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm text-gray-500 dark:text-slate-400 mb-1.5">Model Name</label>
-                            <input type="text" value={config.model_name} onChange={e => updateField('model_name', e.target.value)}
-                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-saffron-500/50" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-gray-500 dark:text-slate-400 mb-1.5">Temperature: {config.temperature}</label>
-                            <input type="range" min="0" max="1" step="0.1" value={config.temperature}
-                                onChange={e => updateField('temperature', parseFloat(e.target.value))}
-                                className="w-full accent-saffron-500" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-gray-500 dark:text-slate-400 mb-1.5">Top K (RAG chunks)</label>
-                            <input type="number" min="1" max="20" value={config.top_k}
-                                onChange={e => updateField('top_k', parseInt(e.target.value) || 4)}
-                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-saffron-500/50" />
-                        </div>
-                    </div>
-                </section>
-
                 {/* Chunking Settings */}
                 <section className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 mb-6 shadow-sm dark:shadow-none transition-colors">
                     <h2 className="text-lg font-semibold text-gray-800 dark:text-slate-200 mb-1">Chunking Settings</h2>
                     <p className="text-xs text-gray-400 dark:text-slate-500 mb-4">Controls how uploaded documents are split into chunks for retrieval. Changes apply to newly uploaded documents only.</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm text-gray-500 dark:text-slate-400 mb-1.5">Top K (RAG chunks)</label>
+                            <input type="number" min="1" max="20" value={config.top_k === undefined ? '' : config.top_k}
+                                onChange={e => updateField('top_k', e.target.value === '' ? '' : Number(e.target.value))}
+                                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-saffron-500/50" />
+                            <p className="text-[10px] text-gray-400 dark:text-slate-600 mt-1">Number of chunks to retrieve during RAG</p>
+                        </div>
                         <div>
                             <label className="block text-sm text-gray-500 dark:text-slate-400 mb-1.5">Chunk Size (characters)</label>
-                            <input type="number" min="100" max="10000" step="100" value={config.chunk_size}
-                                onChange={e => updateField('chunk_size', parseInt(e.target.value) || 1000)}
+                            <input type="number" min="0" step="1" value={config.chunk_size === undefined ? '' : config.chunk_size}
+                                onChange={e => updateField('chunk_size', e.target.value === '' ? '' : Number(e.target.value))}
                                 className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-saffron-500/50" />
                             <p className="text-[10px] text-gray-400 dark:text-slate-600 mt-1">Larger chunks = more context per retrieval, smaller = more precise matching</p>
                         </div>
                         <div>
                             <label className="block text-sm text-gray-500 dark:text-slate-400 mb-1.5">Chunk Overlap (characters)</label>
-                            <input type="number" min="0" max="2000" step="50" value={config.chunk_overlap}
-                                onChange={e => updateField('chunk_overlap', parseInt(e.target.value) || 200)}
+                            <input type="number" min="0" step="1" value={config.chunk_overlap === undefined ? '' : config.chunk_overlap}
+                                onChange={e => updateField('chunk_overlap', e.target.value === '' ? '' : Number(e.target.value))}
                                 className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-saffron-500/50" />
                             <p className="text-[10px] text-gray-400 dark:text-slate-600 mt-1">Overlap prevents information loss at chunk boundaries</p>
                         </div>
