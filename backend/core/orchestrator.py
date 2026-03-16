@@ -26,13 +26,16 @@ class MainOrchestrator:
             response = self.llm.invoke(messages)
             content = response.content.strip()
 
-            # Clean JSON wrapper
-            if content.startswith("```json"):
-                content = content[7:]
-            if content.endswith("```"):
-                content = content[:-3]
-
-            return json.loads(content.strip())
+            # Extract valid JSON block to bypass <think> tags or markdown
+            cleaned = content.strip()
+            start_idx = cleaned.find('{')
+            end_idx = cleaned.rfind('}')
+            
+            if start_idx != -1 and end_idx != -1:
+                cleaned = cleaned[start_idx:end_idx+1]
+                
+            print(f"[Orchestrator] RAW LLM OUTPUT (Cleaned): {cleaned!r}")
+            return json.loads(cleaned)
         except Exception as e:
             print(f"[Orchestrator] Routing error: {e}")
             return {"target": "error", "message": str(e)}
