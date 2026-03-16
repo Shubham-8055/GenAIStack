@@ -41,13 +41,16 @@ class GuardrailsAgent:
             response = self.llm.invoke(messages)
             content = response.content.strip()
 
-            # Clean markdown JSON wrapper
-            if content.startswith("```json"):
-                content = content[7:]
-            if content.endswith("```"):
-                content = content[:-3]
+            # Extract valid JSON block to bypass <think> tags or markdown
+            cleaned_content = content.strip()
+            start_idx = cleaned_content.find('{')
+            end_idx = cleaned_content.rfind('}')
+            
+            if start_idx != -1 and end_idx != -1:
+                cleaned_content = cleaned_content[start_idx:end_idx+1]
 
-            data = json.loads(content.strip())
+            print(f"[Guardrails] RAW LLM OUTPUT (Cleaned): {cleaned_content!r}")
+            data = json.loads(cleaned_content)
 
             status = data.get("status", "unknown").upper()
             if status == "BLOCKED":

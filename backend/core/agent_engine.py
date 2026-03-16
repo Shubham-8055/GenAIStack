@@ -116,7 +116,16 @@ Use this ONLY when the user provides SPECIFIC transaction details such as:
 - A combination of the above to look up a specific transaction
 
 Do NOT use this for vague requests like "show my transactions", "need txn info", or "transaction history".
-For vague requests, use `direct_response` and ask exactly: "{clarification_msg}"
+For vague requests, use `direct_response` and formulate your JSON exactly like this:
+```json
+{{
+    "thought": "User has a vague transaction issue. Asking for more details.",
+    "target": "direct_response",
+    "parameters": {{
+        "message": "{clarification_msg}"
+    }}
+}}
+```
 
 Inputs:
 - `query`: The original user query (the agent will extract params itself).
@@ -140,14 +149,25 @@ Example:
             # Also add the transaction routing rule
             orchestrator_prompt = orchestrator_prompt.replace(
                 "When in doubt",
-                f"If the question is about checking a SPECIFIC transaction with details (date, amount, etc.) → use `transaction_agent`.\n5. If the user asks vaguely about transactions without specific details → use `direct_response` and output EXACTLY: \"{clarification_msg}\"\n6. When in doubt"
+                f"If the question is about checking a SPECIFIC transaction with details (date, amount, etc.) → use `transaction_agent`.\n5. If the user asks vaguely about transactions without specific details → use `direct_response` and output the JSON block with message: \"{clarification_msg}\"\n6. When in doubt"
             )
         else:
             # Fallback: just append to the end
             orchestrator_prompt += tool_agent_section
 
     # Force strict JSON start to prevent API 500 errors with reasoning models
-    orchestrator_prompt += """\n\nCRITICAL: DO NOT output any conversational text or reasoning outside the JSON.
+    orchestrator_prompt += """\n\nCRITICAL JSON IMMUTABLE STRUCTURE:
+You MUST ONLY output a single, valid JSON object. 
+If you are responding to a greeting like 'hi' or just need to talk to the user directly, DO NOT output raw text. You MUST use this EXACT format:
+```json
+{{
+    "thought": "User is greeting or needs a direct reply. I will respond warmly.",
+    "target": "direct_response",
+    "parameters": {{
+        "message": "Hello! How can I help you today?"
+    }}
+}}
+```
 Your entire reasoning MUST go inside the `"thought"` key.
 Your response MUST start with exactly `{` and end with `}`."""
 
