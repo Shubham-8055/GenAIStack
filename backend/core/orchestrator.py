@@ -26,16 +26,49 @@ class MainOrchestrator:
             response = self.llm.invoke(messages)
             content = response.content.strip()
 
+            import re
+            
             # Extract valid JSON block to bypass <think> tags or markdown
             cleaned = content.strip()
             start_idx = cleaned.find('{')
             end_idx = cleaned.rfind('}')
             
             if start_idx != -1 and end_idx != -1:
-                cleaned = cleaned[start_idx:end_idx+1]
-                
-            print(f"[Orchestrator] RAW LLM OUTPUT (Cleaned): {cleaned!r}")
-            return json.loads(cleaned)
+                json_str = cleaned[start_idx:end_idx+1]
+                print(f"[Orchestrator] RAW LLM OUTPUT (Cleaned): {json_str!r}")
+                try:
+                    return json.loads(json_str)
+                except Exception:
+                    pass # Fall through to raw text processing
+            
+            # FALLBACK: If no JSON exists or parsing fails, treat it as a conversational direct response
+            # Strip reasoning tags to prevent leaking thoughts to user
+            raw_msg = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+            
+            # If the raw_msg still looks like an unparseable JSON object (leaked markdown, trailing bracket, etc.)
+            # We don't want to leak JSON syntax to the user UI.
+            if raw_msg.startswith("{") and "target" in raw_msg:
+                print(f"[Orchestrator] Fallback caught broken JSON. Attempting regex extraction.")
+                msg_match = re.search(r'"message"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"', raw_msg)
+                if msg_match:
+                    extracted_msg = msg_match.group(1).encode('utf-8').decode('unicode_escape')
+                    return {
+                        "target": "direct_response",
+                        "parameters": {"message": extracted_msg}
+                    }
+                else:
+                    return {"target": "error", "message": "Failed to parse orchestrator JSON formatting."}
+            
+            print(f"[Orchestrator] Hallucinated raw text, auto-wrapping in direct_response: {raw_msg!r}")
+            
+            if raw_msg:
+                return {
+                    "thought": "LLM output raw text. Auto-wrapped.",
+                    "target": "direct_response",
+                    "parameters": {"message": raw_msg}
+                }
+            else:
+                return {"target": "error", "message": "LLM returned completely empty output."}
         except Exception as e:
             print(f"[Orchestrator] Routing error: {e}")
             return {"target": "error", "message": str(e)}
