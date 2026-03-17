@@ -41,16 +41,32 @@ class GuardrailsAgent:
             response = self.llm.invoke(messages)
             content = response.content.strip()
 
+            import re
+            
             # Extract valid JSON block to bypass <think> tags or markdown
             cleaned_content = content.strip()
             start_idx = cleaned_content.find('{')
             end_idx = cleaned_content.rfind('}')
             
             if start_idx != -1 and end_idx != -1:
-                cleaned_content = cleaned_content[start_idx:end_idx+1]
+                json_str = cleaned_content[start_idx:end_idx+1]
+            else:
+                json_str = cleaned_content
 
-            print(f"[Guardrails] RAW LLM OUTPUT (Cleaned): {cleaned_content!r}")
-            data = json.loads(cleaned_content)
+            print(f"[Guardrails] RAW LLM OUTPUT (Cleaned): {json_str!r}")
+            
+            try:
+                data = json.loads(json_str)
+            except Exception as e:
+                # Regex fallback for corrupted JSON (e.g. "Extra data" from multiple blocks)
+                print(f"[Guardrails] JSON Error ({e}). Attempting regex extraction.")
+                status_match = re.search(r'"status"\s*:\s*"([^"]+)"', content, re.IGNORECASE)
+                topic_match = re.search(r'"topic"\s*:\s*"([^"]+)"', content, re.IGNORECASE)
+                
+                data = {
+                    "status": status_match.group(1).lower() if status_match else "allowed",
+                    "topic": topic_match.group(1) if topic_match else "Unknown"
+                }
 
             status = data.get("status", "unknown").upper()
             if status == "BLOCKED":

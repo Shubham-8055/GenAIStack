@@ -43,6 +43,11 @@ async def run_pipeline(
         dict: {answer, used_rag, agent_path, latency, retrieved_chunks}
     """
     start_time = time.time()
+    
+    print("\n" + "=" * 80)
+    print(f"[{project_id}] 👤 USER QUERY: {user_query}")
+    print(f"[{project_id}] 🤖 INITIATING AGENT PIPELINE...")
+    print("-" * 80)
     chat_history = chat_history or []
     agent_path = []
     used_rag = False
@@ -116,13 +121,14 @@ Use this ONLY when the user provides SPECIFIC transaction details such as:
 - A combination of the above to look up a specific transaction
 
 Do NOT use this for vague requests like "show my transactions", "need txn info", or "transaction history".
-For vague requests, use `direct_response` and formulate your JSON exactly like this:
+For vague requests where details are missing, route to `direct_response` and explicitly ask the user to provide the specific mandatory fields required for this project: **{fields_desc}**.
+Formulate your JSON exactly like this:
 ```json
 {{
-    "thought": "User has a vague transaction issue. Asking for more details.",
+    "thought": "User has a vague transaction issue. I need to ask them for the necessary details ({fields_desc}).",
     "target": "direct_response",
     "parameters": {{
-        "message": "{clarification_msg}"
+        "message": "Could you please provide the transaction details, specifically the {fields_desc}, so I can assist you better?"
     }}
 }}
 ```
@@ -149,7 +155,7 @@ Example:
             # Also add the transaction routing rule
             orchestrator_prompt = orchestrator_prompt.replace(
                 "When in doubt",
-                f"If the question is about checking a SPECIFIC transaction with details (date, amount, etc.) → use `transaction_agent`.\n5. If the user asks vaguely about transactions without specific details → use `direct_response` and output the JSON block with message: \"{clarification_msg}\"\n6. When in doubt"
+                f"If the question is about checking a SPECIFIC transaction with details (date, amount, etc.) → use `transaction_agent`.\nIf the user asks vaguely about transactions without specific details → use `direct_response` and ask them to provide their {fields_desc}.\nWhen in doubt"
             )
         else:
             # Fallback: just append to the end
@@ -181,13 +187,20 @@ Your response MUST start with exactly `{` and end with `}`."""
     params = command.get("parameters", {})
 
     # Normalize target aliases so the LLM can use either name
-    if target in ("transaction_lookup_agent", "transaction_lookup"):
+    if target in ("transaction_lookup_agent", "transaction_lookup", "tool"):
         target = "transaction_agent"
         print(f"[AgentEngine] Normalized target to 'transaction_agent'")
+    elif target in ("ask_details", "clarification"):
+        target = "direct_response"
+        print(f"[AgentEngine] Normalized target to 'direct_response'")
+    elif target == "rag":
+        target = "rag_agent"
+        print(f"[AgentEngine] Normalized target to 'rag_agent'")
 
     print(f"[AgentEngine] Target: {target}, Params: {params}")
 
     # 5. Execute based on routing decision
+        
     if target == "rag_agent" and config.enable_rag:
         agent_path.append("rag_agent")
         used_rag = True
@@ -291,6 +304,11 @@ Your response MUST start with exactly `{` and end with `}`."""
         latency=latency,
         retrieved_chunks=retrieved_chunks,
     )
+
+    print("-" * 80)
+    print(f"[{project_id}] 🛤️  AGENT PATH: {' -> '.join(agent_path)}")
+    print(f"[{project_id}] ✅ FINAL ANSWER: {answer}")
+    print("=" * 80 + "\n")
 
     return {
         "answer": answer,
