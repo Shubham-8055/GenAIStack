@@ -5,6 +5,7 @@ Accepts prompt and LLM instance from project config.
 """
 import json
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from backend.core.utils import strip_think_tags
 
 
 class MainOrchestrator:
@@ -30,15 +31,29 @@ class MainOrchestrator:
             cleaned = content.strip()
             start_idx = cleaned.find('{')
             end_idx = cleaned.rfind('}')
-            
-            if start_idx != -1 and end_idx != -1:
-                cleaned = cleaned[start_idx:end_idx+1]
-                
+
+            # No JSON object found — LLM returned plain text or empty response
+            if start_idx == -1 or end_idx == -1 or end_idx < start_idx:
+                print(f"[Orchestrator] No JSON found in LLM response. Raw: {content!r}")
+                return {
+                    "target": "direct_response",
+                    "parameters": {
+                        "message": content if content else "I'm not sure how to help with that."
+                    }
+                }
+
+            cleaned = cleaned[start_idx:end_idx + 1]
             print(f"[Orchestrator] RAW LLM OUTPUT (Cleaned): {cleaned!r}")
             return json.loads(cleaned)
         except Exception as e:
             print(f"[Orchestrator] Routing error: {e}")
-            return {"target": "error", "message": str(e)}
+            # Graceful fallback — never propagate an 'error' target to the user
+            return {
+                "target": "direct_response",
+                "parameters": {
+                    "message": "I'm having trouble understanding your request. Could you please rephrase?"
+                }
+            }
 
     def execute(self, user_query: str, chat_history: list = None) -> dict:
         """
@@ -74,4 +89,5 @@ class MainOrchestrator:
             HumanMessage(content=f"Context:\n{context}\n\nUser Question: {query}"),
         ]
         response = self.llm.invoke(messages)
-        return response.content
+        return strip_think_tags(response.content)
+

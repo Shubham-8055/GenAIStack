@@ -17,6 +17,7 @@ from backend.agents.formatter_agent import DataFormatterAgent
 from backend.agents.transaction_agent import TransactionAgent
 from backend.core.orchestrator import MainOrchestrator
 from backend.core.external_db import query_external_db, format_external_results
+from backend.core.utils import strip_think_tags
 
 
 async def run_pipeline(
@@ -272,7 +273,7 @@ Your response MUST start with exactly `{` and end with `}`."""
 
     elif target == "direct_response":
         agent_path.append("direct_response")
-        answer = params.get("message", "I am not sure how to respond.")
+        answer = strip_think_tags(params.get("message", "I am not sure how to respond."))
 
     else:
         answer = "I encountered an error processing your request."

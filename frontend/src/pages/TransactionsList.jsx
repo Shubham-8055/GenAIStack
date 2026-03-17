@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getTransactions, seedTransactions } from '../services/api';
-import { Receipt, RefreshCcw, Database, Search, AlertCircle, Loader2 } from 'lucide-react';
+import { Receipt, RefreshCcw, Database, Search, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
 
 const TransactionsList = () => {
     const { projectId } = useParams();
+    const navigate = useNavigate();
     const [transactions, setTransactions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSeeding, setIsSeeding] = useState(false);
@@ -90,14 +91,23 @@ const TransactionsList = () => {
         <div className="p-8 max-w-7xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <Receipt className="text-indigo-500" />
-                        Transactions
-                    </h1>
-                    <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                        View and manage transaction records for the tool-call agent.
-                    </p>
+                <div className="flex items-start gap-4">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="mt-1 p-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                        title="Go back"
+                    >
+                        <ArrowLeft size={18} />
+                    </button>
+                    <div>
+                        <h1 className="text-2xl font-bold flex items-center gap-2">
+                            <Receipt className="text-indigo-500" />
+                            Transactions
+                        </h1>
+                        <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                            View and manage transaction records for the tool-call agent.
+                        </p>
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-3">

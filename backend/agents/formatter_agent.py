@@ -3,6 +3,7 @@ Formatter Agent — Config-driven data formatter.
 Accepts prompt and LLM instance from project config.
 """
 from langchain_core.messages import SystemMessage, HumanMessage
+from backend.core.utils import strip_think_tags
 
 
 class DataFormatterAgent:
@@ -25,7 +26,7 @@ class DataFormatterAgent:
                 HumanMessage(content=f"INSTRUCTION: {instructions}\n\nDATA:\n{text}"),
             ]
             response = self.llm.invoke(messages)
-            return response.content
+            return strip_think_tags(response.content)
 
         except Exception as e:
             print(f"[Formatter] Error: {e}")
