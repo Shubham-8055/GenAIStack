@@ -121,14 +121,12 @@ async def export_project(db: AsyncSession, project_id: uuid.UUID) -> io.BytesIO:
         zf.writestr(f"{root}/agents/guardrails_agent.py", _gen_guardrails_agent())
         zf.writestr(f"{root}/agents/rag_agent.py", _gen_rag_agent())
         zf.writestr(f"{root}/agents/formatter_agent.py", _gen_formatter_agent())
-        zf.writestr(f"{root}/agents/transaction_agent.py", _gen_transaction_agent())
+        zf.writestr(f"{root}/agents/sql_tool_agent.py", _gen_sql_tool_agent())
 
         # 6. Core
         zf.writestr(f"{root}/core/__init__.py", "")
         zf.writestr(f"{root}/core/orchestrator.py", _gen_orchestrator())
         zf.writestr(f"{root}/core/pipeline.py", _gen_pipeline(cfg))
-        if cfg["tool_data_source"] == "external":
-            zf.writestr(f"{root}/core/external_db.py", _gen_external_db())
 
         # 7. Docker
         zf.writestr(f"{root}/Dockerfile", _gen_dockerfile())
@@ -215,44 +213,21 @@ def _gen_pipeline(cfg: dict) -> str:
     if cfg["enable_tool_agent"]:
         if cfg["tool_data_source"] == "external":
             tool_agent_block = '''
-    elif target == "transaction_agent":
-        agent_path.append("transaction_agent")
-        from agents.transaction_agent import TransactionAgent
-        fields = config.get("tool_agent_fields", [])
-        tool_agent = TransactionAgent(
+    elif target == "transaction_agent" or target == "sql_tool_agent":
+        agent_path.append("sql_tool_agent")
+        from agents.sql_tool_agent import SQLToolAgent
+        sql_agent = SQLToolAgent(
             system_prompt=config["tool_agent_prompt"],
             llm=llm,
-            tool_agent_fields=fields,
+            db_uri=config["external_db_connection"],
         )
-        extracted = tool_agent.extract_params(params.get("query", user_query))
-
-        from core.external_db import query_external_db, format_external_results
-        rows = query_external_db(
-            connection_string=config["external_db_connection"],
-            table_name=config["external_db_table"],
-            column_mappings=config.get("external_db_columns", {}),
-            extracted_params=extracted,
-            tool_agent_fields=fields,
-        )
-        answer = format_external_results(rows, config.get("external_db_columns", {}), fields)
+        answer = sql_agent.execute(user_query=user_query, chat_history=chat_history)
 '''
         else:
             tool_agent_block = '''
-    elif target == "transaction_agent":
-        agent_path.append("transaction_agent")
-        from agents.transaction_agent import TransactionAgent
-        import csv, os
-        fields = config.get("tool_agent_fields", [])
-        tool_agent = TransactionAgent(
-            system_prompt=config["tool_agent_prompt"],
-            llm=llm,
-            tool_agent_fields=fields,
-        )
-        extracted = tool_agent.extract_params(params.get("query", user_query))
-
-        # Query from local CSV
-        txns = _query_local_transactions(extracted, fields)
-        answer = _format_local_results(txns, fields)
+    elif target == "transaction_agent" or target == "sql_tool_agent":
+        agent_path.append("csv_fallback")
+        answer = "Data source is not external DB. This export only supports SQLAgent via External DB right now."
 '''
 
     formatter_tool = ""
@@ -570,116 +545,53 @@ class DataFormatterAgent:
 '''
 
 
-def _gen_transaction_agent() -> str:
-    return '''"""Transaction Agent — Extracts params from queries and formats results."""
-import json
-from langchain_core.messages import SystemMessage, HumanMessage
+def _gen_sql_tool_agent() -> str:
+    return '''"""SQL Tool Agent — Integrates with LangChain SQLDatabaseToolkit."""
+from langchain_community.agent_toolkits.sql.base import create_sql_agent
+from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
+from langchain_community.utilities.sql_database import SQLDatabase
 
-
-class TransactionAgent:
-    def __init__(self, system_prompt: str, llm, tool_agent_fields: list = None):
+class SQLToolAgent:
+    def __init__(self, system_prompt: str, llm, db_uri: str):
         self.llm = llm
         self.system_prompt = system_prompt
-        self.tool_agent_fields = tool_agent_fields or []
-
-    def extract_params(self, user_query: str) -> dict:
-        fields_desc = """Extract these parameters:
-1. `date` — YYYY-MM-DD format. "today" = current date. null if not mentioned.
-2. `amount` — Number only, no currency. null if not mentioned.
-"""
-        for i, field in enumerate(self.tool_agent_fields, start=3):
-            fields_desc += f"{i}. `{field['name']}` — {field.get('label', field['name'])}. null if not mentioned.\\n"
-
-        output_fields = '    "date": "YYYY-MM-DD or null",\\n    "amount": 0'
-        for field in self.tool_agent_fields:
-            output_fields += f',\\n    "{field["name"]}": "value or null"'
-
-        prompt = f"""{self.system_prompt}
-{fields_desc}
-Return ONLY valid JSON:
-```json
-{{
-{output_fields}
-}}
-```"""
-        messages = [SystemMessage(content=prompt), HumanMessage(content=user_query)]
+        self.db_uri = db_uri
+        
+        sync_uri = db_uri.replace("+asyncpg", "") if db_uri else ""
+        
         try:
-            response = self.llm.invoke(messages)
-            content = response.content.strip()
-            if content.startswith("```json"): content = content[7:]
-            if content.startswith("```"): content = content[3:]
-            if content.endswith("```"): content = content[:-3]
-            return json.loads(content.strip())
-        except Exception as e:
-            print(f"[TransactionAgent] Error: {e}")
-            result = {"date": None, "amount": None}
-            for f in self.tool_agent_fields:
-                result[f["name"]] = None
-            return result
-'''
-
-
-def _gen_external_db() -> str:
-    return '''"""External DB helper — queries user\'s external database."""
-from sqlalchemy import create_engine, text
-
-
-def query_external_db(connection_string, table_name, column_mappings, extracted_params, tool_agent_fields=None, limit=10):
-    tool_agent_fields = tool_agent_fields or []
-    try:
-        engine = create_engine(connection_string, pool_pre_ping=True)
-        conditions, bind_params = [], {}
-
-        date_col = column_mappings.get("date_col", "txn_date")
-        if extracted_params.get("date"):
-            conditions.append(f"CAST({date_col} AS DATE) = :txn_date")
-            bind_params["txn_date"] = extracted_params["date"]
-
-        amount_col = column_mappings.get("amount_col", "amount")
-        if extracted_params.get("amount") is not None:
-            conditions.append(f"{amount_col} = :amount")
-            bind_params["amount"] = extracted_params["amount"]
-
-        for field in tool_agent_fields:
-            fname = field.get("name", "")
-            fval = extracted_params.get(fname)
-            if fval:
-                col = column_mappings.get(f"{fname}_col", fname)
-                conditions.append(f"CAST({col} AS VARCHAR) = :f_{fname}")
-                bind_params[f"f_{fname}"] = str(fval)
-
-        where = " AND ".join(conditions) if conditions else "1=1"
-        query = f"SELECT * FROM {table_name} WHERE {where} ORDER BY {date_col} DESC LIMIT :lim"
-        bind_params["lim"] = limit
-
-        with engine.connect() as conn:
-            result = conn.execute(text(query), bind_params)
-            return [dict(row._mapping) for row in result]
-    except Exception as e:
-        print(f"[ExternalDB] Error: {e}")
-        return []
-
-
-def format_external_results(rows, column_mappings, tool_agent_fields=None):
-    if not rows:
-        return "No matching transactions found."
-    status_col = column_mappings.get("status_col", "status")
-    amount_col = column_mappings.get("amount_col", "amount")
-    lines = [f"Found **{len(rows)}** matching transaction(s):\\n"]
-    for i, row in enumerate(rows, 1):
-        status = str(row.get(status_col, "unknown")).lower()
-        emoji = {"success": "✅", "failed": "❌", "pending": "⏳"}.get(status, "❓")
-        table_rows = []
-        for col, val in row.items():
-            nice = col.replace("_", " ").title()
-            if col == status_col:
-                table_rows.append(f"| **{nice}** | {emoji} {str(val).upper()} |")
-            elif col == amount_col:
-                table_rows.append(f"| **{nice}** | ₹{val} |")
+            if sync_uri:
+                self.db = SQLDatabase.from_uri(sync_uri)
+                self.toolkit = SQLDatabaseToolkit(db=self.db, llm=self.llm)
+                
+                self.agent_executor = create_sql_agent(
+                    llm=self.llm,
+                    toolkit=self.toolkit,
+                    prefix=self.system_prompt,
+                    verbose=True,
+                    handle_parsing_errors=True
+                )
             else:
-                table_rows.append(f"| **{nice}** | {val} |")
-        lines.append(f"### Transaction {i}\\n| Field | Details |\\n|---|---|\\n" + "\\n".join(table_rows) + "\\n")
-    return "\\n".join(lines)
+                self.agent_executor = None
+        except Exception as e:
+            print(f"[SQLToolAgent] Init error: {e}")
+            self.agent_executor = None
+
+    def execute(self, user_query: str, chat_history: list = None) -> str:
+        if not self.agent_executor:
+            return "Error: Could not connect to the external database."
+        try:
+            context_query = user_query
+            if chat_history:
+                context_lines = [f"{msg.get('role', '')}: {msg.get('content', '')}" for msg in chat_history[-4:]]
+                if context_lines:
+                    history_str = "\\n".join(context_lines)
+                    context_query = f"Recent Chat History:\\n{history_str}\\n\\nCurrent User Request: {user_query}"
+            
+            response = self.agent_executor.invoke({"input": context_query})
+            return response.get("output", "I could not find the information.")
+        except Exception as e:
+            return f"An error occurred while querying the database: {str(e)}"
 '''
 
 

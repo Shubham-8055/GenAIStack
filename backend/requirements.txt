@@ -7,6 +7,7 @@ pydantic
 sqlalchemy[asyncio]
 asyncpg
 greenlet
+psycopg2-binary
 
 # LLM & Embeddings
 langchain

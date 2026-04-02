@@ -300,76 +300,7 @@ const ProjectSettings = () => {
                     </section>
                 )}
 
-                {/* Custom Lookup Fields */}
-                {config.enable_tool_agent && (
-                    <section className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl p-6 mb-6 shadow-sm dark:shadow-none transition-colors">
-                        <div className="flex items-center justify-between mb-1">
-                            <h2 className="text-lg font-semibold text-gray-800 dark:text-slate-200">Custom Lookup Fields</h2>
-                            <button onClick={() => {
-                                const fields = [...(config.tool_agent_fields || [])];
-                                fields.push({ name: '', label: '', sample_values: [] });
-                                updateField('tool_agent_fields', fields);
-                            }}
-                                className="flex items-center gap-1.5 text-sm text-saffron-500 hover:text-saffron-600 font-medium">
-                                <Plus size={14} /> Add Field
-                            </button>
-                        </div>
-                        <p className="text-xs text-gray-400 dark:text-slate-500 mb-4">Define the lookup fields the LLM should extract from user queries (besides date &amp; amount which are always included). For example: Aadhaar Last 4, UPI ID, Mobile Number, RRN, etc.</p>
 
-                        {(config.tool_agent_fields || []).length === 0 && (
-                            <p className="text-sm text-gray-400 dark:text-slate-500 italic text-center py-6">No custom fields defined. Click "Add Field" to create one.</p>
-                        )}
-
-                        <div className="space-y-3">
-                            {(config.tool_agent_fields || []).map((field, idx) => (
-                                <div key={idx} className="bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700/50 rounded-xl p-4">
-                                    <div className="flex items-start gap-3">
-                                        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
-                                            <div>
-                                                <label className="block text-[11px] font-medium text-gray-500 dark:text-slate-400 mb-1">Field Name (code)</label>
-                                                <input value={field.name} placeholder="e.g. aadhaar_last4"
-                                                    onChange={e => {
-                                                        const fields = [...(config.tool_agent_fields || [])];
-                                                        fields[idx] = { ...fields[idx], name: e.target.value.replace(/\s/g, '_').toLowerCase() };
-                                                        updateField('tool_agent_fields', fields);
-                                                    }}
-                                                    className="w-full bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-saffron-500/50" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[11px] font-medium text-gray-500 dark:text-slate-400 mb-1">Display Label</label>
-                                                <input value={field.label} placeholder="e.g. Aadhaar Last 4 Digits"
-                                                    onChange={e => {
-                                                        const fields = [...(config.tool_agent_fields || [])];
-                                                        fields[idx] = { ...fields[idx], label: e.target.value };
-                                                        updateField('tool_agent_fields', fields);
-                                                    }}
-                                                    className="w-full bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-saffron-500/50" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[11px] font-medium text-gray-500 dark:text-slate-400 mb-1">Sample Values (comma-separated)</label>
-                                                <input value={(field.sample_values || []).join(', ')} placeholder="e.g. 1234, 5678, 9012"
-                                                    onChange={e => {
-                                                        const fields = [...(config.tool_agent_fields || [])];
-                                                        fields[idx] = { ...fields[idx], sample_values: e.target.value.split(',').map(s => s.trim()).filter(Boolean) };
-                                                        updateField('tool_agent_fields', fields);
-                                                    }}
-                                                    className="w-full bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-saffron-500/50" />
-                                            </div>
-                                        </div>
-                                        <button onClick={() => {
-                                            const fields = [...(config.tool_agent_fields || [])];
-                                            fields.splice(idx, 1);
-                                            updateField('tool_agent_fields', fields);
-                                        }}
-                                            className="mt-5 p-2 text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all">
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                )}
 
                 {/* Prompts */}
                 <section className="space-y-6">

@@ -14,9 +14,9 @@ from backend.services.llm_provider import get_llm
 from backend.agents.guardrails_agent import GuardrailsAgent
 from backend.agents.rag_agent import RAGAgent
 from backend.agents.formatter_agent import DataFormatterAgent
-from backend.agents.transaction_agent import TransactionAgent
+from backend.agents.formatter_agent import DataFormatterAgent
+from backend.agents.sql_tool_agent import SQLToolAgent
 from backend.core.orchestrator import MainOrchestrator
-from backend.core.external_db import query_external_db, format_external_results
 
 
 async def run_pipeline(
@@ -101,50 +101,22 @@ async def run_pipeline(
     # Dynamically inject transaction_agent into orchestrator prompt if tool agent is enabled
     orchestrator_prompt = config.orchestrator_prompt
     if config.enable_tool_agent:
-        # Append transaction_agent as a routing target
-        # Build dynamic clarification phrase based on project fields
-        field_labels = [f.get("label", f.get("name", "")) for f in (config.tool_agent_fields or [])]
-        if field_labels:
-            fields_desc = "transaction amount, date, and " + ", ".join(field_labels).lower()
-        else:
-            fields_desc = "transaction amount and date"
-        
-        clarification_msg = f"Could you please provide the {fields_desc}?"
-
-        tool_agent_section = f"""
+        tool_agent_section = """
 
 3. `transaction_agent`
-Use this ONLY when the user provides SPECIFIC transaction details such as:
-- A specific date ("yesterday", "10th March", etc.)
-- A specific amount ("₹5000", "5000 rupees")
-- Any specific identifier like {', '.join(field_labels) if field_labels else 'RRN'}
-- A combination of the above to look up a specific transaction
+Use this ONLY when the user asks about SQL database records, transactions, account status, or any external data. 
+Even if the query is vague, route it to `transaction_agent` so the SQL agent can query the database or ask the user a clarifying question based on its findings.
 
-Do NOT use this for vague requests like "show my transactions", "need txn info", or "transaction history".
-For vague requests where details are missing, route to `direct_response` and explicitly ask the user to provide the specific mandatory fields required for this project: **{fields_desc}**.
-Formulate your JSON exactly like this:
+Example:
 ```json
-{{
-    "thought": "User has a vague transaction issue. I need to ask them for the necessary details ({fields_desc}).",
-    "target": "direct_response",
-    "parameters": {{
-        "message": "Could you please provide the transaction details, specifically the {fields_desc}, so I can assist you better?"
-    }}
-}}
-```
-
-Inputs:
-- `query`: The original user query (the agent will extract params itself).
-
-Example:
-Example:
-{{
-    "thought": "User is asking about a specific transaction status.",
+{
+    "thought": "User is asking about a transaction, I will route to transaction_agent.",
     "target": "transaction_agent",
-    "parameters": {{
-        "query": "Check status of 5000 transaction done yesterday, Aadhaar ending 1234"
-    }}
-}}
+    "parameters": {
+        "query": "Check my transactions"
+    }
+}
+```
 """
         # Insert before the STRICT DECISION RULES section
         if "### STRICT DECISION RULES" in orchestrator_prompt:
@@ -152,13 +124,12 @@ Example:
                 "### STRICT DECISION RULES",
                 tool_agent_section + "\n### STRICT DECISION RULES"
             )
-            # Also add the transaction routing rule
+            # Add transaction rule
             orchestrator_prompt = orchestrator_prompt.replace(
                 "When in doubt",
-                f"If the question is about checking a SPECIFIC transaction with details (date, amount, etc.) → use `transaction_agent`.\nIf the user asks vaguely about transactions without specific details → use `direct_response` and ask them to provide their {fields_desc}.\nWhen in doubt"
+                "If the question relates to ANY transactions, records, or specific account data → use `transaction_agent`.\nWhen in doubt"
             )
         else:
-            # Fallback: just append to the end
             orchestrator_prompt += tool_agent_section
 
     # Force strict JSON start to prevent API 500 errors with reasoning models
@@ -227,55 +198,23 @@ Your response MUST start with exactly `{` and end with `}`."""
             answer = formatter.format_response(answer, fmt_instruction)
 
     elif target == "transaction_agent" and config.enable_tool_agent:
-        agent_path.append("transaction_agent")
+        agent_path.append("sql_tool_agent")
 
-        # Get configured fields
-        fields = config.tool_agent_fields or []
-
-        # Use the tool agent to extract params from the query
-        tool_agent = TransactionAgent(
-            system_prompt=config.tool_agent_prompt,
-            llm=llm,
-            tool_agent_fields=fields,
-        )
-        extracted = tool_agent.extract_params(params.get("query", user_query))
-
-        # Safety check: if ALL extracted params are null, ask for clarification
-        # instead of returning all transactions unfiltered
-        has_any_filter = any(
-            v is not None and v != "" and v != "null"
-            for v in extracted.values()
-        )
-        if not has_any_filter:
-            print("[AgentEngine] No filters extracted — asking for clarification.")
-            
-            # Dynamically build question from fields
-            field_labels = [f.get("label", f.get("name", "")) for f in fields]
-            if field_labels:
-                fields_desc = "transaction amount, date, and " + ", ".join(field_labels).lower()
-            else:
-                fields_desc = "transaction amount and date"
-                
-            answer = f"Could you please provide the {fields_desc}?"
-        elif config.tool_data_source == "external" and config.external_db_connection:
-            # Query user's external database
-            rows = query_external_db(
-                connection_string=config.external_db_connection,
-                table_name=config.external_db_table,
-                column_mappings=config.external_db_columns or {},
-                extracted_params=extracted,
-                tool_agent_fields=fields,
-            )
-            answer = format_external_results(rows, config.external_db_columns or {}, fields)
+        # Get the external database URI
+        db_uri = config.external_db_connection
+        if config.tool_data_source != "external" or not db_uri:
+            # Provide sensible fallback if no external DB is found
+            answer = "External SQL database connection is not configured or activated. Please configure it in your Agent Settings."
         else:
-            # Query internal transactions table
-            transactions = await crud.query_transactions(
-                db=db,
-                project_id=project_id,
-                extracted_params=extracted,
-                tool_agent_fields=fields,
+            # Run the SQL agent
+            sql_agent = SQLToolAgent(
+                system_prompt=config.tool_agent_prompt,
+                llm=llm,
+                db_uri=db_uri,
             )
-            answer = tool_agent.format_results(transactions)
+            
+            query = params.get("query", user_query)
+            answer = sql_agent.execute(user_query=query, chat_history=chat_history)
 
         # Optionally apply formatter
         if config.enable_formatter:
@@ -290,6 +229,10 @@ Your response MUST start with exactly `{` and end with `}`."""
     else:
         answer = "I encountered an error processing your request."
 
+    # Strip any leaked <think> blocks from the final answer
+    import re
+    answer = re.sub(r'<think>.*?</think>', '', answer, flags=re.DOTALL).strip()
+    
     # 6. Calculate latency
     latency = round(time.time() - start_time, 3)
 

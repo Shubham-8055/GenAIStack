@@ -15,7 +15,32 @@ from backend.db.engine import get_db
 from backend.db import crud
 from backend.models.database import Transaction
 from backend.models.schemas import TransactionResponse
-from backend.core.external_db import test_external_connection
+
+def test_external_connection(connection_string: str, table_name: str) -> dict:
+    from sqlalchemy import create_engine, text
+    try:
+        sync_uri = connection_string.replace("+asyncpg", "")
+        engine = create_engine(sync_uri, pool_pre_ping=True)
+        with engine.connect() as conn:
+            # Basic connectivity test
+            conn.execute(text("SELECT 1"))
+            columns = []
+            row_count = 0
+            message = "Connection successful! The SQL Agent will auto-detect your tables."
+
+            if table_name and table_name.strip():
+                try:
+                    result = conn.execute(text(f"SELECT * FROM {table_name} LIMIT 1"))
+                    columns = list(result.keys())
+                    row_count = conn.execute(text(f"SELECT COUNT(*) FROM {table_name}")).scalar()
+                    message = f"Connection successful! Table '{table_name}' verified."
+                except Exception:
+                    # Swallow table errors because SQLAgent auto-discovers tables.
+                    pass
+
+            return {"success": True, "columns": columns, "row_count": row_count, "message": message}
+    except Exception as e:
+        return {"success": False, "columns": [], "row_count": 0, "message": str(e)}
 
 router = APIRouter(prefix="/projects/{project_id}/transactions", tags=["transactions"])
 
