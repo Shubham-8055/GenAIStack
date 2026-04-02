@@ -6,6 +6,23 @@ A modular, config-driven, multi-project GenAI platform for building and deployin
 
 ---
 
+## Architecture
+
+```mermaid
+graph TD;
+    User[User Message] --> Guardrails;
+    Guardrails -->|Allowed| Orchestrator;
+    Orchestrator -->|Domain Knowledge/FAQ| RAG_Agent;
+    Orchestrator -->|General Chat / Clarification| direct_response;
+    Orchestrator -->|Live Transaction Data| SQL_Tool_Agent(Transaction Agent);
+    RAG_Agent --> Formatter;
+    SQL_Tool_Agent --> Formatter;
+    Formatter --> Response[User Reply];
+    direct_response --> Response;
+```
+
+---
+
 ## Features
 
 - **Multi-Project** — isolated projects with their own documents, prompts, and vector store

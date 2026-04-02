@@ -29,12 +29,14 @@ class MainOrchestrator:
             import re
             
             # Extract valid JSON block to bypass <think> tags or markdown
-            cleaned = content.strip()
-            start_idx = cleaned.find('{')
-            end_idx = cleaned.rfind('}')
+            # Strip reasoning tags to prevent leaking thoughts or early braces to parser
+            content_no_think = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+            
+            start_idx = content_no_think.find('{')
+            end_idx = content_no_think.rfind('}')
             
             if start_idx != -1 and end_idx != -1:
-                json_str = cleaned[start_idx:end_idx+1]
+                json_str = content_no_think[start_idx:end_idx+1]
                 print(f"[Orchestrator] RAW LLM OUTPUT (Cleaned): {json_str!r}")
                 try:
                     return json.loads(json_str)
@@ -42,8 +44,8 @@ class MainOrchestrator:
                     pass # Fall through to raw text processing
             
             # FALLBACK: If no JSON exists or parsing fails, treat it as a conversational direct response
-            # Strip reasoning tags to prevent leaking thoughts to user
-            raw_msg = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+            raw_msg = content_no_think
+
             
             # If the raw_msg still looks like an unparseable JSON object (leaked markdown, trailing bracket, etc.)
             # We don't want to leak JSON syntax to the user UI.
@@ -59,6 +61,25 @@ class MainOrchestrator:
                 else:
                     return {"target": "error", "message": "Failed to parse orchestrator JSON formatting."}
             
+            # FALLBACK: Minimax XML tool_call 
+            if "<invoke name=" in raw_msg:
+                print(f"[Orchestrator] Detected XML/Minimax tool format.")
+                target_match = re.search(r'<invoke name="([^"]+)">', raw_msg)
+                
+                if target_match:
+                    target_val = target_match.group(1)
+                    params = {}
+                    # Find all parameters
+                    param_matches = re.finditer(r'<parameter name="([^"]+)">([^<]+)</parameter>', raw_msg)
+                    for pm in param_matches:
+                        params[pm.group(1)] = pm.group(2).strip()
+                    
+                    print(f"[Orchestrator] XML Parsed -> Target: {target_val}, Params: {params}")
+                    return {
+                        "target": target_val,
+                        "parameters": params
+                    }
+
             print(f"[Orchestrator] Hallucinated raw text, auto-wrapping in direct_response: {raw_msg!r}")
             
             if raw_msg:
