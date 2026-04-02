@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  chatbot:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:8080/v1}
+      - LLM_API_KEY=${LLM_API_KEY:-not-needed}
+    volumes:
+      - .:/app
+    restart: unless-stopped
