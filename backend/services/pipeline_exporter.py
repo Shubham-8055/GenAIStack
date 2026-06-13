@@ -375,8 +375,8 @@ Configure via environment variables or .env file.
 import os
 from langchain_openai import ChatOpenAI
 
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:8000/v1")
-LLM_API_KEY = os.getenv("LLM_API_KEY", "EMPTY")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "{model_name}")
 
 

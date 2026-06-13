@@ -2,6 +2,7 @@
 SQLAlchemy ORM models for the GenAI Platform.
 Tables: projects, agent_configs, documents, query_logs, transactions
 """
+import os
 import uuid
 from datetime import datetime, timezone
 
@@ -62,7 +63,7 @@ class AgentConfig(Base):
     external_db_columns = Column(JSON, default=dict)           # {date_col, amount_col, ...}
 
     # Model settings
-    model_name = Column(String(255), default="/model")
+    model_name = Column(String(255), default=lambda: os.getenv("LLM_MODEL_NAME", "google/gemma-4-31b-it:free"))
     temperature = Column(Float, default=0.0)
     top_k = Column(Integer, default=4)
 

@@ -251,10 +251,16 @@ from langchain_openai import ChatOpenAI
 
 def get_llm(config: dict):
     """Create LLM instance from config."""
+    # Use environment model name if defined, else fallback to project model name
+    env_model = os.getenv("LLM_MODEL_NAME")
+    model = env_model or config.get("model_name", "google/gemma-4-31b-it:free")
+    if env_model and (config.get("model_name") == "google/gemma-4-31b-it:free" or config.get("model_name") == "/model"):
+        model = env_model
+
     return ChatOpenAI(
-        openai_api_base=os.getenv("LLM_BASE_URL", "http://localhost:8080/v1"),
-        openai_api_key=os.getenv("LLM_API_KEY", "not-needed"),
-        model_name=config.get("model_name", "/model"),
+        openai_api_base=os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
+        openai_api_key=os.getenv("LLM_API_KEY", ""),
+        model_name=model,
         temperature=config.get("temperature", 0.0),
     )
 

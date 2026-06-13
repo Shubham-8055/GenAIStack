@@ -2,6 +2,7 @@
 CRUD operations for all database models.
 All functions are async and expect an AsyncSession.
 """
+import os
 import uuid
 from typing import List, Optional
 
@@ -31,7 +32,7 @@ async def create_project(db: AsyncSession, name: str, description: str = "") -> 
         enable_rag=True,
         enable_formatter=True,
         enable_tool_agent=False,
-        model_name="/model",
+        model_name=os.getenv("LLM_MODEL_NAME", "google/gemma-4-31b-it:free"),
         temperature=0.0,
         top_k=4,
         chunk_size=1000,

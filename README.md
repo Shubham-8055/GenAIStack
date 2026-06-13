@@ -164,9 +164,9 @@ All configuration is via environment variables (see `.env.example`):
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://postgres:postgres@postgres:5432/genai_platform` |
-| `LLM_BASE_URL` | OpenAI-compatible API base URL | `http://183.82.7.228:9532/v1` |
-| `LLM_API_KEY` | API key for LLM | `EMPTY` |
-| `LLM_MODEL_NAME` | Model path/name | `/model` |
+| `LLM_BASE_URL` | OpenAI-compatible API base URL | `https://api.openai.com/v1` (or local Ollama/vLLM URL) |
+| `LLM_API_KEY` | API key for LLM | (e.g. OpenAI key or custom key, default: `""`) |
+| `LLM_MODEL_NAME` | Model path/name | (e.g. `gpt-4o-mini` or custom model name) |
 | `HF_TOKEN` | HuggingFace token (optional) | — |
 | `EMBEDDING_MODEL_NAME` | Sentence-transformers model | `sentence-transformers/all-MiniLM-L6-v2` |
 | `CHROMA_DB_PATH` | ChromaDB storage path | `/app/data_files/chroma_db` |
