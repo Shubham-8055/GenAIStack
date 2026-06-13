@@ -14,13 +14,27 @@ The central control center to manage isolated project environments. Each project
 
 ### 2. Multi-Agent Configuration Portal
 Fine-tune guardrail prompts, orchestrator routing rules, synthesis settings, and output formatting guidelines. Enables dynamic toggling of agent steps.
-![Agent Settings](screenshots/settings.png)
 
-### 3. Playground & Debugging Trace
+* **System & Guardrails Prompts Configuration**:
+  ![Agent Settings 1](screenshots/agent_setting_1.png)
+* **Orchestrator Routing Configuration**:
+  ![Agent Settings 2](screenshots/agent_setting_2.png)
+* **Agent Output Prompts & Parameter Settings**:
+  ![Agent Settings 3](screenshots/agent_setting_3.png)
+
+### 3. Document Upload & Knowledge Base
+Upload documents (TXT, PDF, MD) to build a semantic vector database partitioned per project.
+![Document Upload](screenshots/documents.png)
+
+### 4. Playground & Debugging Trace
 Test chatbot pipelines in real-time. The playground features an execution tracing panel that visualizes the routing path, model latency, and retrieved chunks.
-![Playground Trace](screenshots/playground.png)
+![Playground Trace](screenshots/chat_playground.png)
 
-### 4. Observability & Query Logs
+### 5. Transaction History & Usage Audits
+Audit individual agent execution steps, system transactions, and database operations with cost tracking metrics.
+![Transaction History](screenshots/transactions.png)
+
+### 6. Observability & Query Logs
 A history portal displaying execution stats, routing outcomes, token latencies, and detailed agent steps for performance audits and debugging.
 ![Query Logs](screenshots/logs.png)
 
